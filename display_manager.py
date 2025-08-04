@@ -74,8 +74,9 @@ def has_significant_content_change(line1, line2):
     mode = app_state.get_current_mode()
     
     if mode == 'welcome':
-        # Welcome message should always trigger wave effect
-        return True
+        # Welcome message should only trigger wave effect on first display
+        return (line1 != app_state.display_state['content_line1'] or 
+                line2 != app_state.display_state['content_line2'])
     
     elif mode in ['clock', 'debug']:
         # Only restart wave effect on major changes, not every second

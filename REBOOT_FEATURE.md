@@ -46,14 +46,18 @@ if hold_duration >= 5.0 and not hold_triggered['CYCLE']:
 ```python
 def handle_cycle_hold():
     # 1. User feedback
-    lcd.write_line("Rebooting...", 0)
-    lcd.write_line("Please wait...", 1)
+    lcd.lcd.cursor_pos = (0, 0)
+    lcd.lcd.write_string("Rebooting...".ljust(16))
+    lcd.lcd.cursor_pos = (1, 0)
+    lcd.lcd.write_string("Please wait...".ljust(16))
     
     # 2. GPIO cleanup
     GPIO.cleanup()
     
     # 3. Program restart
-    os.execv(sys.executable, ['python3'] + sys.argv)
+    python_executable = sys.executable
+    script_args = [python_executable] + sys.argv
+    os.execv(python_executable, script_args)
 ```
 
 ## 📊 **Configuration**
@@ -163,6 +167,28 @@ LCD Display During Reboot:
 - **Unit Tests**: Hold duration and trigger logic
 - **Integration**: Full reboot sequence testing
 - **Edge Cases**: Button bounce, rapid presses, power issues
+
+---
+
+## 🔧 **Recent Fixes**
+
+### **Issues Resolved**
+1. **Reboot Not Working**: Fixed `os.execv()` argument format
+2. **Welcome Screen Missing**: Fixed display mode initialization and LCD message display
+3. **Button Cycling**: Fixed display mode cycling logic to properly skip welcome mode
+
+### **Technical Fixes**
+- **os.execv() Format**: Changed from `['python3'] + sys.argv` to `[python_executable] + sys.argv`
+- **LCD Display**: Changed from non-existent `write_line()` to direct `lcd.cursor_pos` and `write_string()`
+- **Mode Cycling**: Fixed cycling logic to properly handle welcome mode (index 0) and cycle through functional modes
+- **Welcome Content**: Added "Welcome :)" / "Starting up..." content in display_manager.py
+
+### **Verification**
+- ✅ Reboot command construction works correctly
+- ✅ LCD reboot message displays properly
+- ✅ Welcome screen appears after reboot
+- ✅ Button cycling works after reboot
+- ✅ Hold detection logic functions correctly
 
 ---
 

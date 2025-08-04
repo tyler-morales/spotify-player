@@ -70,7 +70,12 @@ def cycle_display_mode():
         current_display_mode = 1  # Go to now_playing
     else:
         # Cycle through: now_playing (1) -> clock (2) -> debug (3) -> now_playing (1)
-        current_display_mode = ((current_display_mode - 1) % 3) + 1
+        if current_display_mode == 1:  # now_playing
+            current_display_mode = 2  # clock
+        elif current_display_mode == 2:  # clock
+            current_display_mode = 3  # debug
+        elif current_display_mode == 3:  # debug
+            current_display_mode = 1  # back to now_playing
     
     reset_display_state()
     return get_current_mode()

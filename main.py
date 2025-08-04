@@ -62,16 +62,23 @@ def main():
     # Show welcome message for 3 seconds
     print("👋 Showing welcome message...")
     app_state.set_display_mode(0)  # Set to welcome mode
+    app_state.reset_display_state()  # Ensure clean state for welcome
     
     try:
         lcd.clear()
         
         # Display welcome message with wave effect
         welcome_start_time = time.time()
+        print("🌊 Starting welcome wave effect...")
+        welcome_shown = False
         while time.time() - welcome_start_time < 3.0:  # Show for 3 seconds
             # Update display with welcome message
             content_changed = update_display_with_effects(lcd)
+            if content_changed and not welcome_shown:
+                print("✨ Welcome message displayed on LCD")
+                welcome_shown = True
             time.sleep(0.05)
+        print("⏰ Welcome timeout reached, switching modes...")
         
         # Determine initial mode based on music state
         if app_state.current_track and app_state.current_track.get('is_playing', False):

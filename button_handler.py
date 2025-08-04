@@ -109,8 +109,12 @@ def handle_cycle_hold():
     try:
         lcd = LCD()
         lcd.clear()
-        lcd.write_line("Rebooting...", 0)
-        lcd.write_line("Please wait...", 1)
+        # Write reboot message using direct LCD access
+        lcd.lcd.cursor_pos = (0, 0)
+        lcd.lcd.write_string("Rebooting...".ljust(16))
+        lcd.lcd.cursor_pos = (1, 0)
+        lcd.lcd.write_string("Please wait...".ljust(16))
+        time.sleep(1)  # Give user time to see the message
     except Exception as e:
         print(f"LCD error during reboot: {e}")
     
@@ -124,7 +128,10 @@ def handle_cycle_hold():
     
     # Restart the program
     try:
-        os.execv(sys.executable, ['python3'] + sys.argv)
+        # Use the current Python executable and script arguments
+        python_executable = sys.executable
+        script_args = [python_executable] + sys.argv
+        os.execv(python_executable, script_args)
     except Exception as e:
         print(f"Restart failed: {e}")
         print("Please restart manually")
