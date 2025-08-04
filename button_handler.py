@@ -97,6 +97,7 @@ def handle_cycle_button():
             app_state.music_state['last_playing_time'] = time.time()
             app_state.music_state['stopped_duration'] = 0
 
+
 # Button action mapping
 BUTTON_HANDLERS = {
     'PREV': handle_prev_button,

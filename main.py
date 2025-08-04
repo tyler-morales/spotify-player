@@ -15,6 +15,7 @@ import time
 import RPi.GPIO as GPIO
 from spotify_manager import get_spotify_manager
 from lcd import LCD
+from japanese_processor import get_japanese_processor
 
 # Import modularized components
 import app_state
@@ -33,6 +34,14 @@ def main():
     # Initialize components
     spotify = get_spotify_manager()
     lcd = LCD()
+    japanese_proc = get_japanese_processor()
+    
+    # Initialize Japanese processor availability
+    app_state.set_japanese_processor_availability(japanese_proc.is_available())
+    if japanese_proc.is_available():
+        print("🈳 Japanese romanization enabled")
+    else:
+        print("⚠️ Japanese romanization unavailable (pykakasi not installed)")
     
     if not spotify.is_authenticated():
         print("❌ Spotify not authenticated! Run: python3 auth.py")

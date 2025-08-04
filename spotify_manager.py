@@ -64,18 +64,18 @@ class SpotifyManager:
             current_track = self.sp.current_playback()
             
             if current_track is None or not current_track.get('is_playing'):
-                track_info = {"title": "Nothing playing", "artist": "Paused or stopped", "track_id": None}
+                track_info = {"title": "Nothing playing", "artist": "Paused or stopped", "track_id": None, "is_playing": False}
             else:
                 track = current_track['item']
                 if track is None:
-                    track_info = {"title": "Unknown track", "artist": "No track data", "track_id": None}
+                    track_info = {"title": "Unknown track", "artist": "No track data", "track_id": None, "is_playing": True}
                 else:
                     # Extract track information
                     track_id = track['id']
                     title = track['name']
                     artists = [artist['name'] for artist in track['artists']]
                     artist = ', '.join(artists)
-                    track_info = {"title": title, "artist": artist, "track_id": track_id}
+                    track_info = {"title": title, "artist": artist, "track_id": track_id, "is_playing": True}
                     self.last_track_id = track_id
             
             # Update cache
@@ -86,7 +86,7 @@ class SpotifyManager:
             
         except spotipy.exceptions.SpotifyException as e:
             print(f"Spotify API error: {e}")
-            return {"title": "API Error", "artist": "Check connection", "track_id": None}
+            return {"title": "API Error", "artist": "Check connection", "track_id": None, "is_playing": False}
         except Exception as e:
             print(f"Unexpected error: {e}")
             return self.cached_track_info

@@ -3,7 +3,7 @@ import time
 import sys
 import os
 
-# Add parent directory to path to import spotify_manager
+# Add parent directory to path to import modules
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from spotify_manager import get_spotify_manager
 

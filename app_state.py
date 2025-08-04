@@ -19,6 +19,11 @@ music_state = {
     'auto_sleep_threshold': 30  # seconds
 }
 
+# Japanese text processing settings
+japanese_settings = {
+    'processor_available': False  # Set at runtime based on pykakasi availability
+}
+
 # Display rendering state
 display_state = {
     'mode': 0,
@@ -63,3 +68,12 @@ def cycle_display_mode():
     current_display_mode = (current_display_mode + 1) % len(DISPLAY_MODES)
     reset_display_state()
     return get_current_mode()
+
+def is_japanese_romanization_enabled():
+    """Check if Japanese romanization is available and should be used"""
+    return japanese_settings['processor_available']
+
+def set_japanese_processor_availability(available):
+    """Set Japanese processor availability status"""
+    global japanese_settings
+    japanese_settings['processor_available'] = available

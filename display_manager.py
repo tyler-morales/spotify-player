@@ -4,6 +4,10 @@ Handles display content generation and mode management
 """
 
 import app_state
+from japanese_processor import get_japanese_processor
+
+# Cache for Japanese processing to avoid repeated romanization
+_japanese_cache = {}
 
 def get_display_content():
     """Get content based on current display mode"""
@@ -11,7 +15,35 @@ def get_display_content():
     
     if mode == 'now_playing':
         if app_state.current_track:
-            return app_state.current_track['title'], app_state.current_track['artist']
+            title = app_state.current_track['title']
+            artist = app_state.current_track['artist']
+            
+            # Process Japanese text if processor is available
+            if app_state.is_japanese_romanization_enabled():
+                # Create cache key from original title and artist
+                cache_key = f"{title}|{artist}"
+                
+                # Check if we already processed this content
+                if cache_key in _japanese_cache:
+                    return _japanese_cache[cache_key]
+                
+                # Process Japanese text
+                japanese_proc = get_japanese_processor()
+                track_info = {'title': title, 'artist': artist}
+                processed = japanese_proc.process_track_info(track_info, romanize_enabled=True)
+                
+                # Log romanization only if it occurred and wasn't cached
+                if title != processed['title'] or artist != processed['artist']:
+                    print(f"🈳 Display romanized: '{title}' -> '{processed['title']}'")
+                    print(f"🈳 Display romanized: '{artist}' -> '{processed['artist']}'")
+                
+                # Cache the result
+                result = (processed['title'], processed['artist'])
+                _japanese_cache[cache_key] = result
+                
+                return result
+            
+            return title, artist
         return "No track", "Connect Spotify"
     
     elif mode == 'clock':
