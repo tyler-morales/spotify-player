@@ -4,7 +4,7 @@ Centralized state for the Spotify LCD Player
 """
 
 # Display modes
-DISPLAY_MODES = ['now_playing', 'clock', 'debug']
+DISPLAY_MODES = ['welcome', 'now_playing', 'clock', 'debug']
 
 # Global state variables
 current_display_mode = 0
@@ -63,9 +63,15 @@ def set_display_mode(mode_index):
     reset_display_state()
 
 def cycle_display_mode():
-    """Cycle to next display mode"""
+    """Cycle to next display mode (skipping welcome mode)"""
     global current_display_mode
-    current_display_mode = (current_display_mode + 1) % len(DISPLAY_MODES)
+    # Skip welcome mode (index 0) - only cycle through functional modes
+    if current_display_mode == 0:  # Currently in welcome mode
+        current_display_mode = 1  # Go to now_playing
+    else:
+        # Cycle through: now_playing (1) -> clock (2) -> debug (3) -> now_playing (1)
+        current_display_mode = ((current_display_mode - 1) % 3) + 1
+    
     reset_display_state()
     return get_current_mode()
 
