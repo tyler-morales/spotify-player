@@ -29,6 +29,7 @@ def main():
     print("🧠 Single-threaded with pendulum scrolling - no LCD corruption!")
     print("💤 Smart sleep: Auto-switches to clock after 30s of no music")
     print("🌅 Auto-wake: Returns to now_playing when music resumes or buttons pressed")
+    print("🔄 Hold CYCLE for 5s to reboot - robust recovery mechanism!")
     print("📦 Modularized architecture for better maintainability")
     
     # Initialize components
@@ -58,8 +59,34 @@ def main():
     print("✅ Ready! No more LCD corruption or threading issues.")
     print(f"📊 API calls this session: {spotify.get_api_call_count()}")
     
+    # Show welcome message for 3 seconds
+    print("👋 Showing welcome message...")
+    app_state.set_display_mode(0)  # Set to welcome mode
+    app_state.reset_display_state()  # Ensure clean state for welcome
+    
     try:
         lcd.clear()
+        
+        # Display welcome message with wave effect
+        welcome_start_time = time.time()
+        print("🌊 Starting welcome wave effect...")
+        welcome_shown = False
+        while time.time() - welcome_start_time < 3.0:  # Show for 3 seconds
+            # Update display with welcome message
+            content_changed = update_display_with_effects(lcd)
+            if content_changed and not welcome_shown:
+                print("✨ Welcome message displayed on LCD")
+                welcome_shown = True
+            time.sleep(0.05)
+        print("⏰ Welcome timeout reached, switching modes...")
+        
+        # Determine initial mode based on music state
+        if app_state.current_track and app_state.current_track.get('is_playing', False):
+            print("🎵 Music is playing - starting in now_playing mode")
+            app_state.set_display_mode(1)  # now_playing mode
+        else:
+            print("⏰ No music playing - starting in clock mode")
+            app_state.set_display_mode(2)  # clock mode
         
         while True:
             # Check buttons (event-driven API calls)

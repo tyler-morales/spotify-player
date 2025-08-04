@@ -13,7 +13,10 @@ def get_display_content():
     """Get content based on current display mode"""
     mode = app_state.get_current_mode()
     
-    if mode == 'now_playing':
+    if mode == 'welcome':
+        return "Welcome :)", "Starting up..."
+    
+    elif mode == 'now_playing':
         if app_state.current_track:
             title = app_state.current_track['title']
             artist = app_state.current_track['artist']
@@ -70,7 +73,12 @@ def has_significant_content_change(line1, line2):
     """Check if content change is significant enough to trigger wave effect"""
     mode = app_state.get_current_mode()
     
-    if mode in ['clock', 'debug']:
+    if mode == 'welcome':
+        # Welcome message should only trigger wave effect on first display
+        return (line1 != app_state.display_state['content_line1'] or 
+                line2 != app_state.display_state['content_line2'])
+    
+    elif mode in ['clock', 'debug']:
         # Only restart wave effect on major changes, not every second
         old_line1_base = app_state.display_state['content_line1'].split(':')[0] if ':' in app_state.display_state['content_line1'] else app_state.display_state['content_line1']
         new_line1_base = line1.split(':')[0] if ':' in line1 else line1
