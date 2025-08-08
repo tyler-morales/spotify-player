@@ -1,7 +1,7 @@
-# 🔄 **CYCLE Button Hold Reboot Feature**
+# 🔄 **CYCLE Button Hold Restart/Restart-Service Feature**
 
 ## 📋 **Overview**
-A robust recovery mechanism that allows users to perform a clean reboot of the Spotify LCD Player by holding the CYCLE button for 5 seconds.
+This feature provides a robust recovery mechanism that allows users to perform a clean reboot of the Spotify LCD Player by holding the CYCLE button for 5 seconds. By default, it restarts the application process. You can optionally configure it to restart a systemd service (recommended in production) or reboot the OS.
 
 ## 🎯 **Purpose**
 - **Recovery**: Clean restart without SSH access or power cycling
@@ -71,6 +71,10 @@ def handle_cycle_hold():
 - **CYCLE Button**: GPIO 22 (existing)
 - **Function**: Dual-mode (press/hold)
 - **Priority**: Hold takes precedence over press
+
+### **Restart Modes (environment variables)**
+- **RESTART_MODE**: process | service | reboot (default: process)
+- **SERVICE_NAME**: spotify-player.service (used when RESTART_MODE=service)
 
 ## 🛡️ **Safety Considerations**
 
@@ -196,4 +200,9 @@ LCD Display During Reboot:
 
 The CYCLE button hold reboot feature provides a robust, user-friendly recovery mechanism that enhances the reliability and maintainability of the Spotify LCD Player. It follows established patterns for embedded systems while maintaining the simplicity and elegance of the existing codebase.
 
-**Key Value**: Enables users to recover from software issues without technical intervention, making the system more robust and user-friendly in production environments. 
+**Key Value**: Enables users to recover from software issues without technical intervention, making the system more robust and user-friendly in production environments.
+
+## Recommendations
+- **Development**: process
+- **Production under systemd**: service (ensures logs, restarts, and watchdogs work properly)
+- **Hardware/OS fault recovery**: reboot

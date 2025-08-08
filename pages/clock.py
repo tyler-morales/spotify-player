@@ -1,3 +1,4 @@
+# DEPRECATED: Legacy page module kept for reference only. Use main.py flow.
 # pages/clock.py
 import time
 

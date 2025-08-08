@@ -18,6 +18,11 @@ pip3 install -r requirements.txt
 SPOTIPY_CLIENT_ID=your_client_id_here
 SPOTIPY_CLIENT_SECRET=your_client_secret_here
 SPOTIPY_REDIRECT_URI=http://127.0.0.1:8888/callback
+
+# Optional: restart behavior for CYCLE hold
+# RESTART_MODE=process|service|reboot
+# SERVICE_NAME=spotify-player.service
+# SERVICES_TO_RESTART=raspotify.service,spotify-player.service
 ```
 
 ### 4. Authenticate Once
@@ -38,11 +43,12 @@ python3 main.py
 
 ## 4-Button Controls & Wiring 🎮
 
-### Button Wiring:
 - **PREV Button → GPIO 17**: Previous Track
 - **PLAY Button → GPIO 18**: Play/Pause  
 - **NEXT Button → GPIO 27**: Next Track
 - **CYCLE Button → GPIO 22**: Cycle Display Modes
+
+CYCLE (hold 5s): Restart app / service / OS (configurable)
 
 ### Wiring Instructions:
 1. Connect each button between GPIO pin and GND
@@ -95,6 +101,35 @@ Button Layout:
 ```bash
 python3 test.py  # Shows caching in action
 # Watch for "API Call #X" messages in main.py
+```
+
+## Systemd (recommended)
+Create a service to manage restarts and auto-start on boot.
+
+Example: /etc/systemd/system/spotify-player.service
+```
+[Unit]
+Description=Spotify LCD Player
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/spotify-player
+ExecStart=/usr/bin/python3 /home/pi/spotify-player/main.py
+Restart=on-failure
+Environment=RESTART_MODE=service
+Environment=SERVICE_NAME=spotify-player.service
+Environment=SERVICES_TO_RESTART=raspotify.service,spotify-player.service
+
+[Install]
+WantedBy=multi-user.target
+```
+Then:
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now spotify-player.service
 ```
 
 That's it! 🎉

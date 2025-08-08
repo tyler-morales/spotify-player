@@ -15,16 +15,15 @@ A Raspberry Pi project that displays track information, clock, and system debug 
   - Typewriter effect for initial text display
 
 - **Smart GPIO Navigation**: 
-  - Single button on GPIO pin 17 cycles through all pages
-  - Immediate response when scrolling is interrupted
-  - Proper debouncing to prevent accidental triggers
-  - Visual feedback during interactions
+- 4-button controls: PREV (GPIO17), PLAY (GPIO18), NEXT (GPIO27), CYCLE (GPIO22)
+- Debounced inputs with visual feedback
+- Hold CYCLE 5s to restart app/service (configurable)
 
 ## Hardware Requirements
 
 - Raspberry Pi with GPIO pins
 - 16x2 I2C LCD display (PCF8574 controller, default address 0x27)
-- Push button connected to GPIO pin 17 (with pull-down resistor)
+- 4x momentary push buttons: GPIO 17/18/27/22 to GND (internal pull-downs)
 
 ## File Structure
 
@@ -32,14 +31,15 @@ A Raspberry Pi project that displays track information, clock, and system debug 
 ├── README.md              # This file
 ├── learnings.md           # Study topics and learning resources
 ├── lcd.py                 # LCD control class with animations
-├── pages.py               # Main application - page switching logic
+├── main.py                # NEW: Main application entrypoint (standard)
+├── pages.py               # LEGACY: Deprecated, forwards to main.py
 ├── buttons.py             # Button testing utility
 ├── now-playing.py         # Simple now-playing display demo
-└── pages/
+└── pages/                 # LEGACY: old page modules (kept for reference)
     ├── __init__.py
-    ├── clock.py           # Clock page implementation
-    ├── now_playing.py     # Now playing page implementation
-    └── debug.py           # System debug information page
+    ├── clock.py           # Clock page implementation (legacy)
+    ├── now_playing.py     # Now playing page implementation (legacy)
+    └── debug.py           # System debug information page (legacy)
 ```
 
 ## Key Components
@@ -50,68 +50,36 @@ A Raspberry Pi project that displays track information, clock, and system debug 
 - **Interruptible Scrolling**: `scroll_both()` monitors GPIO during animation and can be stopped mid-scroll
 - **Display Management**: Smart text handling for overflow content
 
-### Page System (`pages.py`)
-- **Page Cycling**: ClockPage → NowPlayingPage → DebugPage → repeat
-- **Interrupt Handling**: Detects when scrolling is interrupted vs. normal completion
-- **GPIO Monitoring**: Responsive button detection with proper debouncing
-- **State Management**: Clean transitions between pages with LCD clearing
+### Modern App Flow (`main.py`)
+- Single-threaded LCD updates with background monitoring for Spotify track changes
+- 4-button control (PREV/PLAY/NEXT/CYCLE) with hold-to-restart feature
+- Auto-sleep to clock when idle; auto-wake on playback/buttons
 
-### Page Modules (`pages/`)
-- **`clock.py`**: Real-time clock display with formatted time
-- **`now_playing.py`**: Track information with interruptible scrolling for long titles
-- **`debug.py`**: System stats using `/proc/uptime` and standard Python libraries
+### Legacy Page System (`pages.py` + `pages/`)
+- Kept only for reference/backward compatibility
+- `pages.py` now forwards to `main.py`
 
 ## Usage
 
-### Run the main application:
+### Run the application:
 ```bash
-python3 pages.py
+python3 main.py
 ```
 
+Note: `pages.py` exists only for backward compatibility and prints a deprecation notice if used.
+
 ### Controls:
-- **Press button once**: Cycle to next page
-- **Press button during scrolling**: Immediately skip to next page
+- **PREV/PLAY/NEXT**: Playback controls
+- **CYCLE (short press)**: Cycle display modes (now_playing → clock → debug)
+- **CYCLE (hold 5s)**: Restart the application or service (configurable; see REBOOT_FEATURE.md)
 - **Ctrl+C**: Exit application cleanly
 
 ### Test individual components:
 ```bash
-python3 buttons.py          # Test button detection
-python3 now-playing.py      # Test basic LCD display
-```
-
-## Technical Implementation
-
-### Interruptible Scrolling Algorithm
-1. Display starts with typewriter effect
-2. If text > 16 chars, begin scrolling animation
-3. **Every scroll frame**: Check GPIO pin state
-4. **Button pressed**: Immediately return from scroll function
-5. **Main loop**: Detect early return and handle page transition
-
-### Page Flow Logic
-```
-Display Page → Check if interrupted → Handle transition → Next page
-     ↓              ↓                      ↓
-Scrolling      Button pressed?     Immediate switch
-continues      ↓           ↓              ↓
-     ↓        Yes         No        Wait for button
-Complete      ↓           ↓              ↓
-     ↓    Interrupt   Normal wait    Page cycle
-Wait for      ↓           ↓              ↓
-button    Page switch  Page switch   Page switch
+python3 testing/test_welcome_screen.py   # headless welcome/mode logic
+python3 testing/test_reboot_feature.py   # headless hold-to-restart logic
 ```
 
 ## Development Status
 
-✅ **Completed Features:**
-- Multi-page navigation system
-- Interruptible scrolling animations
-- GPIO button handling with debouncing
-- System debug information display
-- Clean page transitions
-
-🚧 **Next Phase:**
-- Spotify API integration
-- Real-time track information
-- Dynamic content updates
-- Enhanced UI interactions
+✅ Completed Features include the modern `main.py` flow, caching, romanization, and hold-to-restart. Legacy files remain for reference but are no longer the recommended path.
