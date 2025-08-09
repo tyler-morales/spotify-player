@@ -1,11 +1,23 @@
-import spotipy
-from spotipy.oauth2 import SpotifyOAuth
+# Spotipy is optional when using MPRIS only
+try:
+    import spotipy
+    from spotipy.oauth2 import SpotifyOAuth
+except Exception:
+    spotipy = None
+    SpotifyOAuth = None
 import os
 from dotenv import load_dotenv
 import time
+import platform
 
 # Load environment variables
 load_dotenv()
+
+# Try to import Linux MPRIS (playerctl) backend
+try:
+    from linux_mpris import LinuxMPRIS
+except Exception:
+    LinuxMPRIS = None
 
 class SpotifyManager:
     def __init__(self):
@@ -22,11 +34,35 @@ class SpotifyManager:
         self.cache_timestamp = 0
         self.cache_duration = 10  # Cache for 10 seconds
         self.api_call_count = 0
+
+        # Backend selection
+        self.local = None
+        default_backend = 'local' if platform.system() == 'Linux' else 'web'
+        backend_pref = os.getenv('SPOTIFY_BACKEND', default_backend)
+
+        if backend_pref == 'local':
+            if platform.system() == 'Linux' and LinuxMPRIS is not None and LinuxMPRIS.available():
+                try:
+                    player_name = os.getenv('SPOTIFY_MPRIS_PLAYER')  # e.g. spotify, spotifyd, ncspot
+                    self.local = LinuxMPRIS(player=player_name)
+                    print(f"Using Linux MPRIS control via playerctl (player: {self.local.player or 'auto'})")
+                except Exception as e:
+                    print(f"Linux MPRIS unavailable: {e}")
+                    self.local = None
         
-        self._authenticate()
+        # Authenticate Web API only if not using local backend
+        if not self.local:
+            self._authenticate()
     
     def _authenticate(self):
         """Authenticate with Spotify using OAuth"""
+        if self.local:
+            # Local backend does not need Web API auth
+            return
+        if SpotifyOAuth is None:
+            print("Spotipy not installed; Web API disabled. Install spotipy to enable fallback.")
+            self.sp = None
+            return
         try:
             auth_manager = SpotifyOAuth(
                 client_id=self.client_id,
@@ -48,6 +84,15 @@ class SpotifyManager:
     
     def get_current_track(self, force_refresh=False):
         """Get currently playing track information with smart caching"""
+        # Local Linux backend path (no Web API, no rate limits)
+        if self.local:
+            track_info = self.local.get_current_track()
+            # Update cache timestamp and last_track_id for consistency
+            self.cached_track_info = track_info
+            self.cache_timestamp = time.time()
+            self.last_track_id = track_info.get('track_id')
+            return track_info
+
         if not self.sp:
             return self.cached_track_info
         
@@ -84,9 +129,6 @@ class SpotifyManager:
             
             return track_info
             
-        except spotipy.exceptions.SpotifyException as e:
-            print(f"Spotify API error: {e}")
-            return {"title": "API Error", "artist": "Check connection", "track_id": None, "is_playing": False}
         except Exception as e:
             print(f"Unexpected error: {e}")
             return self.cached_track_info
@@ -109,6 +151,9 @@ class SpotifyManager:
     
     def is_authenticated(self):
         """Check if Spotify is properly authenticated"""
+        # Local backend needs no auth
+        if self.local:
+            return True
         return self.sp is not None
     
     def refresh_connection(self):
@@ -118,6 +163,8 @@ class SpotifyManager:
     
     def play_pause(self):
         """Toggle play/pause - optimized to minimize API calls"""
+        if self.local:
+            return self.local.play_pause()
         if not self.sp:
             return False
         try:
@@ -141,6 +188,8 @@ class SpotifyManager:
     
     def next_track(self):
         """Skip to next track - track info will be refreshed by caller"""
+        if self.local:
+            return self.local.next_track()
         if not self.sp:
             return False
         try:
@@ -153,6 +202,8 @@ class SpotifyManager:
     
     def previous_track(self):
         """Skip to previous track - track info will be refreshed by caller"""
+        if self.local:
+            return self.local.previous_track()
         if not self.sp:
             return False
         try:
