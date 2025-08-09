@@ -1,4 +1,6 @@
 # pages/now_playing.py
+# DEPRECATED: Legacy page module kept for reference only. Use main.py flow.
+
 import time
 import sys
 import os

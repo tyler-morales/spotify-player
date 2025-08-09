@@ -8,6 +8,8 @@ import RPi.GPIO as GPIO
 import app_state
 import os
 import sys
+import subprocess
+import shutil
 
 # 4-Button configuration
 BUTTON_PINS = {
@@ -101,41 +103,91 @@ def handle_cycle_button():
             app_state.music_state['stopped_duration'] = 0
 
 def handle_cycle_hold():
-    """Handle 5-second hold on CYCLE button for reboot"""
-    print("🔄 CYCLE button held for 5 seconds - initiating reboot...")
-    
-    # Clear display to show reboot status
+    """Handle 5-second hold on CYCLE button for restart/recovery"""
+    print("🔄 CYCLE button held for 5 seconds - initiating recovery...")
+
+    # Determine restart mode from environment
+    restart_mode = os.getenv("RESTART_MODE", "process").strip().lower()
+    services_env = os.getenv("SERVICES_TO_RESTART", "").strip()
+    single_service = os.getenv("SERVICE_NAME", "").strip()
+    services = []
+    if services_env:
+        services = [s.strip() for s in services_env.split(',') if s.strip()]
+    elif single_service:
+        services = [single_service]
+
+    # Prepare LCD message based on action
+    line1 = "Restarting app" if restart_mode == "process" else (
+        "Restarting svc" if restart_mode == "service" else "Rebooting OS...")
+
+    # Clear display to show status
     from lcd import LCD
     try:
         lcd = LCD()
         lcd.clear()
-        # Write reboot message using direct LCD access
         lcd.lcd.cursor_pos = (0, 0)
-        lcd.lcd.write_string("Rebooting...".ljust(16))
+        lcd.lcd.write_string((line1 + "...")[:16].ljust(16))
         lcd.lcd.cursor_pos = (1, 0)
         lcd.lcd.write_string("Please wait...".ljust(16))
-        time.sleep(1)  # Give user time to see the message
+        time.sleep(0.5)
     except Exception as e:
-        print(f"LCD error during reboot: {e}")
-    
-    # Clean up GPIO
+        print(f"LCD error during restart message: {e}")
+
+    # Clean up GPIO before taking action
     try:
         GPIO.cleanup()
     except Exception as e:
         print(f"GPIO cleanup error: {e}")
-    
-    print("🔄 Restarting Spotify Player...")
-    
-    # Restart the program
+
+    def restart_process():
+        print("🚀 Restarting current process via execv")
+        try:
+            python_executable = sys.executable
+            script_args = [python_executable] + sys.argv
+            os.execv(python_executable, script_args)
+        except Exception as e:
+            print(f"Process restart failed: {e}")
+            print("Please restart manually")
+            sys.exit(1)
+
+    # Execute selected mode with fallbacks
     try:
-        # Use the current Python executable and script arguments
-        python_executable = sys.executable
-        script_args = [python_executable] + sys.argv
-        os.execv(python_executable, script_args)
+        if restart_mode == "service":
+            if not services:
+                print("⚠️ No services configured (SERVICE_NAME or SERVICES_TO_RESTART). Falling back to process restart.")
+                return restart_process()
+            if not shutil.which("systemctl"):
+                print("⚠️ systemctl not available. Falling back to process restart.")
+                return restart_process()
+
+            # Restart listed services (e.g., raspotify, then this app's service)
+            for svc in services:
+                print(f"🔁 systemctl restart {svc}")
+                try:
+                    subprocess.run(["systemctl", "restart", svc], check=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                except Exception as svc_err:
+                    print(f"Service restart error for {svc}: {svc_err}")
+            time.sleep(0.5)
+            # Exit so the manager (systemd) fully takes over
+            sys.exit(0)
+
+        elif restart_mode == "reboot":
+            print("💻 Requesting OS reboot")
+            if shutil.which("systemctl"):
+                subprocess.run(["systemctl", "reboot"], check=False)
+            else:
+                subprocess.run(["reboot"], check=False)
+            # If reboot command returns (permissions?), fall back
+            time.sleep(1)
+            return restart_process()
+
+        else:
+            # Default: process restart
+            return restart_process()
+
     except Exception as e:
-        print(f"Restart failed: {e}")
-        print("Please restart manually")
-        sys.exit(1)
+        print(f"Recovery action failed: {e}")
+        return restart_process()
 
 
 # Button action mapping
