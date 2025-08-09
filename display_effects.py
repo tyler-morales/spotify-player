@@ -107,55 +107,59 @@ def update_display_with_effects(lcd):
     return False  # No content change
 
 def _update_slide_transition(lcd, line1, line2, now, width):
-    """Slide old content left out while new content slides in from right.
+    """Slide old content left out while new content slides in from right using
+    a sliding window over old_line + new_line to avoid mid-screen stalling.
     Returns True while transition is active, False when finished."""
     step = app_state.display_state.get('transition_step', 0)
     speed = app_state.display_state.get('transition_speed', 0.06)
     last = app_state.display_state.get('transition_last_update', 0)
     if now - last < speed:
         return True  # wait for next frame
-    
+
     old1 = app_state.display_state.get('prev_visible_line1', ' ' * width)
     old2 = app_state.display_state.get('prev_visible_line2', ' ' * width)
-    new1_full = (line1 or '')
-    new2_full = (line2 or '')
-    
-    # Build the new incoming windows based on step
-    # We slide over exactly width frames: step from 0..width
-    max_steps = width
-    if step <= max_steps:
-        # Compute incoming slice length for this step
-        incoming_len = min(step, width)
-        # Right-anchored incoming portion: take first incoming_len characters of new text
-        incoming1 = new1_full[:incoming_len].rjust(incoming_len)
-        incoming2 = new2_full[:incoming_len].rjust(incoming_len)
-        # Outgoing portion is old text shifted left by step
-        left1 = (old1[step:] if step < width else '')
-        left2 = (old2[step:] if step < width else '')
-        # Compose: left part + incoming from right, then pad to width
-        composed1 = (left1 + incoming1).ljust(width)[:width]
-        composed2 = (left2 + incoming2).ljust(width)[:width]
-        
-        lcd.lcd.cursor_pos = (0, 0)
-        lcd.lcd.write_string(composed1)
-        lcd.lcd.cursor_pos = (1, 0)
-        lcd.lcd.write_string(composed2)
-        
+    new1 = (line1 or '')
+    new2 = (line2 or '')
+
+    # Build composite buffers: old (exactly width) + new (left-justified to width)
+    old1 = old1[:width].ljust(width)
+    old2 = old2[:width].ljust(width)
+    new1_padded = new1[:width].ljust(width)
+    new2_padded = new2[:width].ljust(width)
+
+    composite1 = old1 + new1_padded
+    composite2 = old2 + new2_padded
+
+    max_steps = width  # step 0..width inclusive yields final state at step==width
+
+    # Clamp step within range and compute window
+    s = min(step, max_steps)
+    window1 = composite1[s:s+width]
+    window2 = composite2[s:s+width]
+
+    lcd.lcd.cursor_pos = (0, 0)
+    lcd.lcd.write_string(window1)
+    lcd.lcd.cursor_pos = (1, 0)
+    lcd.lcd.write_string(window2)
+
+    # Advance or finish
+    if step < max_steps:
         app_state.display_state['transition_step'] = step + 1
         app_state.display_state['transition_last_update'] = now
         return True
-    
-    # Transition complete: render stable new frame, reset, and allow scrolling
-    lcd.lcd.cursor_pos = (0, 0)
-    lcd.lcd.write_string((line1[:width] if len(line1) >= width else line1).ljust(width))
-    lcd.lcd.cursor_pos = (1, 0)
-    lcd.lcd.write_string((line2[:width] if len(line2) >= width else line2).ljust(width))
+
+    # Transition complete
     app_state.display_state['transition_active'] = False
     app_state.display_state['transition_step'] = 0
     app_state.display_state['last_update'] = now  # start scroll timer after slide
-    # Small initial pause at ends so long text doesn't jump immediately
     app_state.display_state['pause_until1'] = now + 1.0
     app_state.display_state['pause_until2'] = now + 1.0
+
+    # Ensure final frame is the new content left-justified
+    lcd.lcd.cursor_pos = (0, 0)
+    lcd.lcd.write_string(new1_padded)
+    lcd.lcd.cursor_pos = (1, 0)
+    lcd.lcd.write_string(new2_padded)
     return False
 
 def _update_wave_effect(lcd, line1, line2, now, width, wave_speed):
