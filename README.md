@@ -19,6 +19,12 @@ A Raspberry Pi project that displays track information, clock, and system debug 
 - Debounced inputs with visual feedback
 - Hold CYCLE 5s to restart app/service (configurable)
 
+- **Mock LCD for Development**: 
+- ASCII-based LCD visualization using keyboard characters
+- Perfect for development and testing without hardware
+- Automatic fallback when GPIO/LCD libraries unavailable
+- See [MOCK_LCD.md](MOCK_LCD.md) for details
+
 ## Hardware Requirements
 
 - Raspberry Pi with GPIO pins
@@ -29,12 +35,17 @@ A Raspberry Pi project that displays track information, clock, and system debug 
 
 ```
 ├── README.md              # This file
+├── MOCK_LCD.md            # Mock LCD documentation and usage
 ├── learnings.md           # Study topics and learning resources
 ├── lcd.py                 # LCD control class with animations
+├── mock_lcd.py            # Mock LCD implementation for development
 ├── main.py                # NEW: Main application entrypoint (standard)
 ├── pages.py               # LEGACY: Deprecated, forwards to main.py
 ├── buttons.py             # Button testing utility
 ├── now-playing.py         # Simple now-playing display demo
+├── testing/               # Test files including mock LCD demos
+│   ├── test_mock_lcd*.py  # Mock LCD test suite
+│   └── ...                # Other test files
 └── pages/                 # LEGACY: old page modules (kept for reference)
     ├── __init__.py
     ├── clock.py           # Clock page implementation (legacy)
@@ -67,6 +78,19 @@ python3 main.py
 ```
 
 Note: `pages.py` exists only for backward compatibility and prints a deprecation notice if used.
+
+### Development without hardware:
+The application automatically uses Mock LCD when hardware libraries are unavailable:
+```bash
+# Will automatically use mock LCD on non-Raspberry Pi systems
+python3 main.py
+
+# Force mock LCD mode
+USE_MOCK_LCD=true python3 main.py
+
+# Test mock LCD functionality
+python3 testing/test_mock_lcd_static.py
+```
 
 ### Controls:
 - **PREV/PLAY/NEXT**: Playback controls

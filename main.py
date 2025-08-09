@@ -12,7 +12,15 @@ Modularized version with clean separation of concerns:
 """
 
 import time
-import RPi.GPIO as GPIO
+
+# Try to import GPIO, handle gracefully if not available
+try:
+    import RPi.GPIO as GPIO
+    GPIO_AVAILABLE = True
+except ImportError:
+    GPIO_AVAILABLE = False
+    print("⚠️  RPi.GPIO not available - running in mock mode")
+
 from spotify_manager import get_spotify_manager
 from lcd import LCD
 from japanese_processor import get_japanese_processor
@@ -102,7 +110,8 @@ def main():
     except KeyboardInterrupt:
         print(f"\n👋 Goodbye! Total API calls this session: {spotify.get_api_call_count()}")
         lcd.clear()
-        GPIO.cleanup()
+        if GPIO_AVAILABLE:
+            GPIO.cleanup()
 
 if __name__ == "__main__":
     main()
