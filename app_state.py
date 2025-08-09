@@ -36,7 +36,14 @@ display_state = {
     'pause_until1': 0,
     'pause_until2': 0,
     'last_update': 0,
-    'wave_complete': False
+    'wave_complete': False,
+    # --- New slide-transition state ---
+    'transition_active': False,
+    'transition_step': 0,
+    'transition_speed': 0.06,  # seconds per frame
+    'transition_last_update': 0,
+    'prev_visible_line1': ' ' * 16,
+    'prev_visible_line2': ' ' * 16,
 }
 
 def reset_display_state():
@@ -49,7 +56,11 @@ def reset_display_state():
         'scroll_dir2': 1,
         'pause_until1': 0,
         'pause_until2': 0,
-        'wave_complete': False
+        'wave_complete': False,
+        # Reset any in-progress transitions on mode/content reset
+        'transition_active': False,
+        'transition_step': 0,
+        'transition_last_update': 0,
     })
 
 def get_current_mode():

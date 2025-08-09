@@ -14,22 +14,69 @@ def update_display_with_effects(lcd):
     
     # Check if content significantly changed
     if has_significant_content_change(line1, line2):
-        # Content changed - reset everything and show wave effect
+        # Content changed - trigger slide transition for now_playing, wave for others
         print(f"🔄 Display content changed: '{line1}' | '{line2}'")
-        app_state.display_state.update({
-            'content_line1': line1,
-            'content_line2': line2,
-            'scroll_pos1': 0,
-            'scroll_pos2': 0,
-            'scroll_dir1': 1,
-            'scroll_dir2': 1,
-            'pause_until1': 0,
-            'pause_until2': 0,
-            'wave_complete': False,
-            'last_update': time.time()
-        })
-        lcd.clear()
-        return True  # Content changed
+        mode = app_state.get_current_mode()
+        if mode == 'now_playing':
+            # Capture what is currently visible to avoid jump when text was scrolling
+            prev1 = app_state.display_state.get('prev_visible_line1', ' ' * 16)
+            prev2 = app_state.display_state.get('prev_visible_line2', ' ' * 16)
+            # Read last written content from state if available
+            try:
+                # If we were in scrolling mode, reconstruct the visible window
+                width = 16
+                if len(app_state.display_state['content_line1']) > width:
+                    pos = max(0, min(app_state.display_state['scroll_pos1'], len(app_state.display_state['content_line1']) - width))
+                    prev1 = app_state.display_state['content_line1'][pos:pos+width].ljust(width)
+                else:
+                    prev1 = app_state.display_state['content_line1'][:width].ljust(width)
+                if len(app_state.display_state['content_line2']) > width:
+                    pos2 = max(0, min(app_state.display_state['scroll_pos2'], len(app_state.display_state['content_line2']) - width))
+                    prev2 = app_state.display_state['content_line2'][pos2:pos2+width].ljust(width)
+                else:
+                    prev2 = app_state.display_state['content_line2'][:width].ljust(width)
+            except Exception:
+                pass
+            
+            app_state.display_state.update({
+                'content_line1': line1,
+                'content_line2': line2,
+                'scroll_pos1': 0,
+                'scroll_pos2': 0,
+                'scroll_dir1': 1,
+                'scroll_dir2': 1,
+                'pause_until1': 0,
+                'pause_until2': 0,
+                # Start slide transition
+                'transition_active': True,
+                'transition_step': 0,
+                'transition_last_update': time.time(),
+                'prev_visible_line1': prev1,
+                'prev_visible_line2': prev2,
+                # Skip wave for transitions; we'll slide instead, then go to scroll
+                'wave_complete': True,
+                'last_update': time.time()
+            })
+            # Do not clear here; slide uses current buffer as the base
+            return True  # Content changed
+        else:
+            # Non-now_playing: use wave effect like before
+            app_state.display_state.update({
+                'content_line1': line1,
+                'content_line2': line2,
+                'scroll_pos1': 0,
+                'scroll_pos2': 0,
+                'scroll_dir1': 1,
+                'scroll_dir2': 1,
+                'pause_until1': 0,
+                'pause_until2': 0,
+                'transition_active': False,
+                'transition_step': 0,
+                'wave_complete': False,
+                'last_update': time.time()
+            })
+            lcd.clear()
+            return True
     
     # Update content silently for minor changes (like clock seconds)
     app_state.display_state['content_line1'] = line1
@@ -41,7 +88,14 @@ def update_display_with_effects(lcd):
     pause_time = 4.0
     wave_speed = 0.15
     
-    # Show wave effect first for new content
+    # If a transition is active, run it first
+    if app_state.display_state.get('transition_active'):
+        if _update_slide_transition(lcd, line1, line2, now, width):
+            # Transition still in progress
+            return False
+        # Transition finished – fallthrough to scrolling
+    
+    # Show wave effect first for new content (only if not overridden by transition)
     if not app_state.display_state['wave_complete']:
         return _update_wave_effect(lcd, line1, line2, now, width, wave_speed)
     
@@ -51,6 +105,58 @@ def update_display_with_effects(lcd):
         app_state.display_state['last_update'] = now
     
     return False  # No content change
+
+def _update_slide_transition(lcd, line1, line2, now, width):
+    """Slide old content left out while new content slides in from right.
+    Returns True while transition is active, False when finished."""
+    step = app_state.display_state.get('transition_step', 0)
+    speed = app_state.display_state.get('transition_speed', 0.06)
+    last = app_state.display_state.get('transition_last_update', 0)
+    if now - last < speed:
+        return True  # wait for next frame
+    
+    old1 = app_state.display_state.get('prev_visible_line1', ' ' * width)
+    old2 = app_state.display_state.get('prev_visible_line2', ' ' * width)
+    new1_full = (line1 or '')
+    new2_full = (line2 or '')
+    
+    # Build the new incoming windows based on step
+    # We slide over exactly width frames: step from 0..width
+    max_steps = width
+    if step <= max_steps:
+        # Compute incoming slice length for this step
+        incoming_len = min(step, width)
+        # Right-anchored incoming portion: take first incoming_len characters of new text
+        incoming1 = new1_full[:incoming_len].rjust(incoming_len)
+        incoming2 = new2_full[:incoming_len].rjust(incoming_len)
+        # Outgoing portion is old text shifted left by step
+        left1 = (old1[step:] if step < width else '')
+        left2 = (old2[step:] if step < width else '')
+        # Compose: left part + incoming from right, then pad to width
+        composed1 = (left1 + incoming1).ljust(width)[:width]
+        composed2 = (left2 + incoming2).ljust(width)[:width]
+        
+        lcd.lcd.cursor_pos = (0, 0)
+        lcd.lcd.write_string(composed1)
+        lcd.lcd.cursor_pos = (1, 0)
+        lcd.lcd.write_string(composed2)
+        
+        app_state.display_state['transition_step'] = step + 1
+        app_state.display_state['transition_last_update'] = now
+        return True
+    
+    # Transition complete: render stable new frame, reset, and allow scrolling
+    lcd.lcd.cursor_pos = (0, 0)
+    lcd.lcd.write_string((line1[:width] if len(line1) >= width else line1).ljust(width))
+    lcd.lcd.cursor_pos = (1, 0)
+    lcd.lcd.write_string((line2[:width] if len(line2) >= width else line2).ljust(width))
+    app_state.display_state['transition_active'] = False
+    app_state.display_state['transition_step'] = 0
+    app_state.display_state['last_update'] = now  # start scroll timer after slide
+    # Small initial pause at ends so long text doesn't jump immediately
+    app_state.display_state['pause_until1'] = now + 1.0
+    app_state.display_state['pause_until2'] = now + 1.0
+    return False
 
 def _update_wave_effect(lcd, line1, line2, now, width, wave_speed):
     """Handle wave effect animation for new content"""
