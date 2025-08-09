@@ -1,41 +1,89 @@
+"""
+Mock LCD Display Module
+Provides a console-based ASCII representation of a 16x2 LCD display
+using keyboard characters for development and testing purposes.
+"""
+
 import time
+import sys
 import os
 
-class LCD:
+class MockLCD:
+    """Mock LCD that renders to console using ASCII characters"""
+    
     def __init__(self, address=0x27, cols=16, rows=2):
-        # Check if we should use mock LCD (when hardware not available or explicitly requested)
-        use_mock_lcd = (
-            os.getenv('USE_MOCK_LCD', '').lower() in ('true', '1', 'yes') or
-            not self._hardware_available()
-        )
-        
-        if use_mock_lcd:
-            print("🖥️  Using Mock LCD (hardware not available or explicitly requested)")
-            from mock_lcd import MockLCDWrapper
-            self.lcd = MockLCDWrapper(address, cols, rows).lcd
-        else:
-            print("🔌 Using Hardware LCD")
-            from RPLCD.i2c import CharLCD
-            self.lcd = CharLCD('PCF8574', address, cols=cols, rows=rows)
-            self.lcd.clear()
+        self.cols = cols
+        self.rows = rows
+        self.address = address
+        self.display_buffer = [[' ' for _ in range(cols)] for _ in range(rows)]
+        self.cursor_row = 0
+        self.cursor_col = 0
+        print(f"🖥️  Mock LCD initialized ({cols}x{rows}) at address {hex(address)}")
+        self._render_display()
 
-    def _hardware_available(self):
-        """Check if LCD hardware libraries are available"""
-        try:
-            from RPLCD.i2c import CharLCD
-            import RPi.GPIO as GPIO
-            return True
-        except ImportError:
-            return False
+    def clear(self):
+        """Clear the display buffer and render"""
+        self.display_buffer = [[' ' for _ in range(self.cols)] for _ in range(self.rows)]
+        self.cursor_row = 0
+        self.cursor_col = 0
+        self._render_display()
+
+    def _render_display(self):
+        """Render the current display buffer to console"""
+        # Clear previous output and move cursor up
+        if hasattr(self, '_first_render') and not self._first_render:
+            # Move cursor up 4 lines to overwrite previous display
+            sys.stdout.write('\033[4A')
+        else:
+            self._first_render = False
+        
+        # Top border
+        print('┌' + '─' * self.cols + '┐')
+        
+        # Content rows
+        for row in self.display_buffer:
+            content = ''.join(row)
+            print('│' + content + '│')
+        
+        # Bottom border
+        print('└' + '─' * self.cols + '┘')
+        sys.stdout.flush()
+
+    @property
+    def cursor_pos(self):
+        """Get current cursor position"""
+        return (self.cursor_row, self.cursor_col)
+
+    @cursor_pos.setter
+    def cursor_pos(self, pos):
+        """Set cursor position (row, col)"""
+        row, col = pos
+        self.cursor_row = max(0, min(row, self.rows - 1))
+        self.cursor_col = max(0, min(col, self.cols - 1))
+
+    def write_string(self, text):
+        """Write string at current cursor position"""
+        for i, char in enumerate(text):
+            if self.cursor_col + i < self.cols:
+                self.display_buffer[self.cursor_row][self.cursor_col + i] = char
+        self._render_display()
+
+
+class MockLCDWrapper:
+    """Wrapper class that mimics the lcd.LCD interface"""
+    
+    def __init__(self, address=0x27, cols=16, rows=2):
+        self.lcd = MockLCD(address, cols, rows)
 
     def clear(self):
         self.lcd.clear()
 
     def write_line_wave(self, text, line=0, speed=0.1, interrupt_callback=None):
-        """Typewriter effect for first appearance."""
+        """Typewriter effect for first appearance - same as real LCD"""
         self.lcd.cursor_pos = (line, 0)
         self.lcd.write_string(' ' * 16)
         self.lcd.cursor_pos = (line, 0)
+        
         for i in range(1, min(len(text), 16) + 1):
             # Check for interrupt before each character
             if interrupt_callback and interrupt_callback():
@@ -45,17 +93,12 @@ class LCD:
             self.lcd.write_string(text[:i].ljust(16))
             if speed > 0:
                 time.sleep(speed)
+        
         self.lcd.cursor_pos = (line, 0)
         self.lcd.write_string(text[:16].ljust(16))
 
     def scroll_both(self, line1, line2, width=16, scroll_speed=0.25, pause=5, button_pin=None, interrupt_callback=None):
-        # Try to import RPi.GPIO only if we need it for button checking
-        GPIO = None
-        if button_pin is not None:
-            try:
-                import RPi.GPIO as GPIO
-            except ImportError:
-                print("⚠️  GPIO not available for button checking in mock mode")
+        """Scrolling animation for both lines - same logic as real LCD but without GPIO"""
         
         # Fade-in on both lines with proper wave effect
         self.write_line_wave(line1, 0, speed=0.1, interrupt_callback=interrupt_callback)
@@ -82,10 +125,7 @@ class LCD:
         while True:
             now = time.monotonic()
             
-            # Check for button press to interrupt scrolling (only if GPIO available)
-            if button_pin is not None and GPIO is not None and GPIO.input(button_pin) == GPIO.HIGH:
-                return  # Break out of scroll and return control
-            
+            # For mock LCD, we can't check GPIO buttons, so just use interrupt callback
             # Check for callback interrupt (track change, etc.)
             if interrupt_callback and interrupt_callback():
                 return  # Break out for track update
@@ -137,4 +177,5 @@ class LCD:
             time.sleep(0.05)  # Small sleep to prevent excessive CPU usage
 
     def display(self, line1, line2, button_pin=None, interrupt_callback=None):
+        """Display method that calls scroll_both"""
         self.scroll_both(line1, line2, button_pin=button_pin, interrupt_callback=interrupt_callback)

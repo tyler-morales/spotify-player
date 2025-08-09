@@ -4,12 +4,19 @@ Manages GPIO button configuration and event handling
 """
 
 import time
-import RPi.GPIO as GPIO
 import app_state
 import os
 import sys
 import subprocess
 import shutil
+
+# Try to import GPIO, handle gracefully if not available
+try:
+    import RPi.GPIO as GPIO
+    GPIO_AVAILABLE = True
+except ImportError:
+    GPIO_AVAILABLE = False
+    print("⚠️  RPi.GPIO not available - button functionality disabled")
 
 # 4-Button configuration
 BUTTON_PINS = {
@@ -23,6 +30,10 @@ HOLD_DURATION = 5.0  # 5 seconds for reboot
 
 def setup_buttons():
     """Initialize GPIO for buttons"""
+    if not GPIO_AVAILABLE:
+        print("⚠️  Buttons disabled - GPIO not available (mock mode)")
+        return
+    
     GPIO.setmode(GPIO.BCM)
     for pin in BUTTON_PINS.values():
         GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
@@ -200,6 +211,9 @@ BUTTON_HANDLERS = {
 
 def check_buttons():
     """Check button states and handle presses - returns True if any button was pressed"""
+    if not GPIO_AVAILABLE:
+        return False  # No buttons to check in mock mode
+    
     button_pressed = False
     
     # Initialize button states and hold tracking if not exists
