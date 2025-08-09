@@ -5,16 +5,18 @@ A Raspberry Pi project that displays track information, clock, and system debug 
 ## Features
 
 - **Multi-Page Display System**: Three pages accessible via GPIO button cycling
+
   - **Now Playing Page**: Displays track title and artist with smart scrolling for overflow text
   - **Clock Page**: Shows current time with typewriter animation
   - **Debug Page**: System information including date, uptime, and current time
 
-- **Intelligent Scrolling**: 
+- **Intelligent Scrolling**:
+
   - Automatic scrolling for text longer than 16 characters
   - **Interruptible scrolling** - press button during animation to immediately skip to next page
   - Typewriter effect for initial text display
 
-- **Smart GPIO Navigation**: 
+- **Smart GPIO Navigation**:
 - 4-button controls: PREV (GPIO17), PLAY (GPIO18), NEXT (GPIO27), CYCLE (GPIO22)
 - Debounced inputs with visual feedback
 - Hold CYCLE 5s to restart app/service (configurable)
@@ -45,23 +47,44 @@ A Raspberry Pi project that displays track information, clock, and system debug 
 ## Key Components
 
 ### LCD Class (`lcd.py`)
+
 - **I2C Communication**: Handles PCF8574-based LCD control
 - **Typewriter Effect**: `write_line_wave()` creates character-by-character display
 - **Interruptible Scrolling**: `scroll_both()` monitors GPIO during animation and can be stopped mid-scroll
 - **Display Management**: Smart text handling for overflow content
 
 ### Modern App Flow (`main.py`)
+
 - Single-threaded LCD updates with background monitoring for Spotify track changes
 - 4-button control (PREV/PLAY/NEXT/CYCLE) with hold-to-restart feature
 - Auto-sleep to clock when idle; auto-wake on playback/buttons
 
 ### Legacy Page System (`pages.py` + `pages/`)
+
 - Kept only for reference/backward compatibility
 - `pages.py` now forwards to `main.py`
+
+## New: Smooth Slide Transition Between Tracks
+
+- Outgoing title/artist slide left out while the new track slides in from the right.
+- Works with overflow text: captures the currently visible scrolling window so the slide is seamless.
+- After the slide completes, auto-pauses briefly before resuming pendulum scrolling.
+
+Configuration (advanced):
+
+- Transition speed (seconds per frame): `app_state.display_state['transition_speed']` (default `0.06`).
+- Feature applies to `now_playing` mode; other modes still use the wave effect.
+
+Testing:
+
+- Run the slide transition tests (headless):
+  - `python3 testing/test_slide_transition.py`
+- Also see: `testing/test_display.py` and `testing/test_welcome_screen.py` for related display behaviors.
 
 ## Usage
 
 ### Run the application:
+
 ```bash
 python3 main.py
 ```
@@ -69,12 +92,14 @@ python3 main.py
 Note: `pages.py` exists only for backward compatibility and prints a deprecation notice if used.
 
 ### Controls:
+
 - **PREV/PLAY/NEXT**: Playback controls
 - **CYCLE (short press)**: Cycle display modes (now_playing → clock → debug)
 - **CYCLE (hold 5s)**: Restart the application or service (configurable; see REBOOT_FEATURE.md)
 - **Ctrl+C**: Exit application cleanly
 
 ### Test individual components:
+
 ```bash
 python3 testing/test_welcome_screen.py   # headless welcome/mode logic
 python3 testing/test_reboot_feature.py   # headless hold-to-restart logic
